@@ -1320,7 +1320,7 @@
       IMPLICIT NONE
       TYPE(eqType), INTENT(OUT) :: lEq
 
-      INTEGER(KIND=IKIND) iBc, iBf, iDmn
+      INTEGER(KIND=IKIND) iBc, iBf, iDmn, iRe
 
       IF (ALLOCATED(lEq%bc)) THEN
          DO iBc=1, lEq%nBc
@@ -1350,6 +1350,13 @@
          END DO
          DEALLOCATE(lEq%bf)
       END IF
+      IF (ALLOCATED(lEq%DirichletRegion)) THEN
+         DO iRe=1, lEq%nDirichletRegion
+            DEALLOCATE(lEq%DirichletRegion(iRe)%gid)
+         END DO
+         DEALLOCATE(lEq%DirichletRegion)
+      END IF
+
       IF (ALLOCATED(lEq%dmn))      DEALLOCATE(lEq%dmn)
       IF (ALLOCATED(lEq%dmnIB))    DEALLOCATE(lEq%dmnIB)
       IF (ALLOCATED(lEq%output))   DEALLOCATE(lEq%output)
@@ -1368,6 +1375,7 @@
       lEq%nBf     = 0
       lEq%useTLS  = .FALSE.
       lEq%assmTLS = .FALSE.
+      lEq%nDirichletRegion = 0
 
       RETURN
       END SUBROUTINE DESTROYEQ

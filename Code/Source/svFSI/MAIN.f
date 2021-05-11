@@ -116,6 +116,9 @@
          DO
             iEqOld = cEq
 
+!     Apply Dirichlet region strongly
+            CALL SETDIRICHLETREGION(An, Yn, Dn, cEq)
+
             IF (cplBC%coupled .AND. cEq.EQ.1) THEN
                CALL SETBCCPL
                CALL SETBCDIR(An, Yn, Dn)

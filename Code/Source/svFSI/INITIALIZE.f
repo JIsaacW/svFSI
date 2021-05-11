@@ -203,7 +203,7 @@
 
       dbg = "Calling FSILS_LHS_CREATE"
       CALL FSILS_LHS_CREATE(lhs, communicator, gtnNo, tnNo, nnz, ltg,
-     2   rowPtr, colPtr, nFacesLS)
+     2   rowPtr, colPtr, nFacesLS, SUM(eq%nDirichletRegion))
 
 !     Initialize Trilinos data structure
       IF (flag) THEN
@@ -367,11 +367,17 @@
 !     Preparing faces and BCs
       CALL BAFINI()
 
+!     Preparing Dirichlet region
+      CALL DIRICHLETREGIONINI()
+
 !     As all the arrays are allocated, call BIN to VTK for conversion
       IF (bin2VTK) CALL PPBIN2VTK()
 
 !     Making sure the old solution satisfies BCs
       CALL SETBCDIR(Ao, Yo, Do)
+      DO iEq=1, nEq
+         CALL SETDIRICHLETREGION(Ao, Yo, Do, iEq)
+      END DO
 
 !     Preparing TXT files
       CALL TXT(.TRUE.)
@@ -383,6 +389,42 @@
 
       RETURN
       END SUBROUTINE INITIALIZE
+!--------------------------------------------------------------------
+      SUBROUTINE DIRICHLETREGIONINI()
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+      
+      INTEGER(KIND=IKIND) iEq, i, j
+
+      IF (SUM(eq%nDirichletRegion) .EQ. 0) RETURN
+
+      i = 0
+      DO j = 1, nEq
+         IF(eq(j)%nDirichletRegion .GT. 0) THEN
+            i = i+1
+            iEq = j
+         END IF
+      END DO
+      IF (i .GT. 1) THEN
+         err = "Dirichlet Region can only be specified in one equation!"
+         STOP
+      END IF
+
+      IF (eq(iEq)%dof .EQ. nsd+1) lhs%DirichletRegion(:)%dof = nsd
+      DO i = 1, eq(iEq)%nDirichletRegion
+         lhs%DirichletRegion(i)%ID   = eq(iEq)%DirichletRegion(i)%ID
+         lhs%DirichletRegion(i)%n    = eq(iEq)%DirichletRegion(i)%n
+         ALLOCATE(lhs%DirichletRegion(i)%glob(lhs%DirichletRegion(i)%n))
+         DO j = 1, lhs%DirichletRegion(i)%n
+            lhs%DirichletRegion(i)%glob(j) = 
+     2         lhs%map(eq(iEq)%DirichletRegion(i)%gid(j))
+         END DO
+      END DO
+
+      RETURN
+
+      END SUBROUTINE DIRICHLETREGIONINI
 !--------------------------------------------------------------------
 !     Initializing accelaration, velocity and displacement to zero
       SUBROUTINE ZEROINIT(timeP)

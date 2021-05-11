@@ -120,6 +120,16 @@
          END IF
       END DO
 
+      IF (lhs%nDirichletRegion .GT. 0) THEN
+         DO i = 1, lhs%nDirichletRegion
+            IF (.NOT. lhs%DirichletRegion(i)%incFlag) CYCLE
+            DO a=1, lhs%DirichletRegion(i)%n
+               Ac = lhs%DirichletRegion(i)%glob(a)
+               W(1:lhs%DirichletRegion(i)%dof,Ac) = 0._LSRP
+            END DO
+         END DO
+      END IF
+
 !     Pre-multipling K with W: K = W*K
       CALL PREMUL(rowPtr, lhs%nNo, lhs%nnz, dof, Val, W)
 
@@ -187,6 +197,17 @@
             END DO
          END IF
       END DO
+      IF (lhs%nDirichletRegion .GT. 0) THEN
+         DO i = 1, lhs%nDirichletRegion
+            IF (.NOT. lhs%DirichletRegion(i)%incFlag) CYCLE
+            DO a=1, lhs%DirichletRegion(i)%n
+               ! Ac = msh(iM)%fa(iFa)%gN(a)
+               Ac = lhs%DirichletRegion(i)%glob(a)
+               Wr(1:lhs%DirichletRegion(i)%dof,Ac) = 0._LSRP
+            END DO
+         END DO
+      END IF
+      
       CALL FSILS_COMMUV(lhs, dof, Wr)
       ! For parallel case, val and Wr can be larger than 1 due to
       ! the addition operator in FSILS_COMMUV. Hence need renormalization.

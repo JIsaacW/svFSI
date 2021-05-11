@@ -124,6 +124,21 @@
          INTEGER(KIND=LSIP), ALLOCATABLE :: ptr(:)
       END TYPE FSILS_cSType
 
+      TYPE FSILS_DirichletRegion
+         SEQUENCE
+!        Included in the computations   (IN)
+!        (=False: no internal Dir; =True:internal Dir)
+         LOGICAL :: incFlag = .False.
+!        Global node number             (IN)
+         INTEGER(KIND=LSIP), ALLOCATABLE :: glob(:)
+!        Degree of freedom
+         INTEGER(KIND=LSIP) dof
+!        ID of Dirichlet region
+         INTEGER(KIND=LSIP) :: ID = 0
+!        Number of Dirichlet points
+         INTEGER(KIND=LSIP) :: n = 0
+      END TYPE FSILS_DirichletRegion
+
       TYPE FSILS_lhsType
          SEQUENCE
 !        Free of created                     (USE)
@@ -142,6 +157,8 @@
          INTEGER(KIND=LSIP) shnNo
 !        Number of communication requests    (USE)
          INTEGER(KIND=LSIP) :: nReq = 0
+!        Number of Dirichlet regions         (USE)
+         INTEGER(KIND=LSIP) :: nDirichletRegion = 0
 !        Column pointer                      (USE)
          INTEGER(KIND=LSIP), ALLOCATABLE :: colPtr(:)
 !        Row pointer                         (USE)
@@ -153,6 +170,7 @@
          TYPE(FSILS_commuType) commu
          TYPE(FSILS_cSType), ALLOCATABLE :: cS(:)
          TYPE(FSILS_faceType), ALLOCATABLE :: face(:)
+         TYPE(FSILS_DirichletRegion), ALLOCATABLE :: DirichletRegion(:)
       END TYPE FSILS_lhsType
 
 !     LS related structures

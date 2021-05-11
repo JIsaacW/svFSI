@@ -60,14 +60,14 @@
          END SUBROUTINE FSILS_COMMU_FREE
 
          SUBROUTINE FSILS_LHS_CREATE(lhs, commu, gnNo, nNo, nnz,        &
-     &      gNodes, rowPtr, colPtr, nFaces)
+     &      gNodes, rowPtr, colPtr, nFaces, nDirichletRegion)
             INCLUDE "FSILS_STRUCT.h"
             TYPE(FSILS_lhsType), INTENT(INOUT) :: lhs
             TYPE(FSILS_commuType), INTENT(IN) :: commu
             INTEGER(KIND=LSIP), INTENT(IN) :: gnNo, nNo, nnz
             INTEGER(KIND=LSIP), INTENT(IN) :: gNodes(nNo),              &
      &         rowPtr(nNo+1), colPtr(nnz)
-            INTEGER(KIND=LSIP), INTENT(IN) :: nFaces
+            INTEGER(KIND=LSIP), INTENT(IN) :: nFaces, nDirichletRegion
          END SUBROUTINE FSILS_LHS_CREATE
          SUBROUTINE external_LHS_CREATE(lhs, commu, gnNo, nNo,          &
      &      gNodes, nFaces)

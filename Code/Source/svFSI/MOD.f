@@ -421,6 +421,14 @@
          REAL(KIND=RKIND) :: tol = 1.E-6_RKIND
       END TYPE cntctModelType
 
+!     Dirichlet Region
+      TYPE DirichletRegionType
+!        Region ID, used in parallel
+         INTEGER(KIND=IKIND) :: ID = 0
+         INTEGER(KIND=IKIND) :: n = 0
+         INTEGER(KIND=IKIND), ALLOCATABLE :: gid(:)
+      END TYPE DirichletRegionType
+
 !--------------------------------------------------------------------
 !     All the subTypes are defined, now defining the major types that
 !     will be directly allocated
@@ -621,6 +629,8 @@
          INTEGER(KIND=IKIND) phys
 !        Pointer to start of unknown Yo(:,s:e)
          INTEGER(KIND=IKIND) s
+!        Number of internal Dirichlet regions
+         INTEGER(KIND=IKIND) :: nDirichletRegion = 0
 !        \alpha_f
          REAL(KIND=RKIND) af
 !        \alpha_m
@@ -657,6 +667,8 @@
          TYPE(outputType), ALLOCATABLE :: outIB(:)
 !        Body force associated with this equation
          TYPE(bfType), ALLOCATABLE :: bf(:)
+!        Dirichlet region
+         TYPE(DirichletRegionType), ALLOCATABLE :: DirichletRegion(:)
       END TYPE eqType
 
 !     This type will be used to write data in the VTK files.

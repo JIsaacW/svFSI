@@ -364,6 +364,22 @@
       END DO
       DEALLOCATE(tMs)
 
+!     Partitioning Dirichlet regions
+      IF (cm%mas()) THEN
+         flag = .False.
+         DO iEq=1, nEq
+            IF (eq(iEq)%nDirichletRegion .GT. 0) THEN
+               flag = .True.
+               EXIT
+            END IF
+         END DO
+      END IF
+      CALL cm%bcast(flag)
+      CALL cm%bcast(iEq)
+      IF (flag) THEN
+         CALL PARTDIRICHLETREGION(Eq(iEq))
+      END IF
+
       RETURN
       END SUBROUTINE DISTRIBUTE
 !####################################################################
@@ -1606,4 +1622,114 @@ c            wrn = " ParMETIS failed to partition the mesh"
 
       RETURN
       END SUBROUTINE PARTFACE
+!--------------------------------------------------------------------
+!     This routine partitions the Dirichlet region based on the already
+!     partitioned mesh
+      SUBROUTINE PARTDIRICHLETREGION(lEq)
+      USE COMMOD
+      IMPLICIT NONE
+
+      TYPE(eqType), INTENT(INOUT) :: lEq
+
+      INTEGER(KIND=IKIND) :: a, Ac, iRe, nDirichletRegion, maxLength
+      INTEGER(KIND=IKIND), ALLOCATABLE :: gNodes(:), gid(:), id(:)
+      TYPE(DirichletRegionType), ALLOCATABLE :: DirichletRegion(:)
+
+      IF (cm%seq()) RETURN
+
+      IF (cm%mas()) THEN
+         nDirichletRegion = lEq%nDirichletRegion
+         ALLOCATE(DirichletRegion(nDirichletRegion))
+         DO iRe = 1, nDirichletRegion
+            DirichletRegion(iRe)%ID = lEq%DirichletRegion(iRe)%ID
+            DirichletRegion(iRe)%n  = lEq%DirichletRegion(iRe)%n
+            ALLOCATE(DirichletRegion(iRe)%gid(DirichletRegion(iRe)%n))
+            DirichletRegion(iRe)%gid = lEq%DirichletRegion(iRe)%gid
+         END DO
+
+         ! Destroy lEq
+         DO iRe = 1, nDirichletRegion
+            lEq%DirichletRegion(iRe)%ID = 0
+            lEq%DirichletRegion(iRe)%n  = 0
+            DEALLOCATE(lEq%DirichletRegion(iRe)%gid)
+         END DO
+         DEALLOCATE(lEq%DirichletRegion)
+         lEq%nDirichletRegion = 0
+      END IF
+
+      ! Make full copy of Dirichlet region in every rank
+      CALL cm%bcast(nDirichletRegion)
+      IF (cm%slv()) ALLOCATE(DirichletRegion(nDirichletRegion))
+      DO iRe = 1, nDirichletRegion
+         CALL cm%bcast(DirichletRegion(iRe)%ID)
+         CALL cm%bcast(DirichletRegion(iRe)%n )
+         IF (cm%slv()) 
+     2      ALLOCATE(DirichletRegion(iRe)%gid(DirichletRegion(iRe)%n))
+         CALL cm%bcast(DirichletRegion(iRe)%gid)
+      END DO
+
+      ALLOCATE(gNodes(tnNo))
+      DO a = 1, tnNo
+         gNodes(a) = ltg(a)
+      END DO
+
+      ! How many Dirichlet regions in current rank
+      ALLOCATE(id(nDirichletRegion))
+      id = 0
+      lEq%nDirichletRegion = 0
+      DO iRe = 1, nDirichletRegion
+         DO a = 1, DirichletRegion(iRe)%n
+            IF (ANY(gNodes==DirichletRegion(iRe)%gid(a))) THEN
+               lEq%nDirichletRegion = lEq%nDirichletRegion + 1
+               ! Here iRe = DirichletRegion(iRe)%ID
+               id(lEq%nDirichletRegion) = DirichletRegion(iRe)%ID
+               EXIT
+            END IF
+         END DO
+      END DO
+
+      ! How many Dirichlet points in current rank
+      maxLength = MAXVAL(DirichletRegion(:)%n)
+      ALLOCATE(lEq%DirichletRegion(lEq%nDirichletRegion))
+      ALLOCATE(gid(maxLength))
+      DO iRe = 1, lEq%nDirichletRegion
+         lEq%DirichletRegion(iRe)%ID = id(iRe)
+         gid = 0
+         Ac  = 0
+         DO a = 1, DirichletRegion(id(iRe))%n
+            IF (ANY(gNodes==DirichletRegion(id(iRe))%gid(a))) THEN
+               Ac = Ac + 1
+               gid(Ac) = DirichletRegion(id(iRe))%gid(a)
+            END IF
+         END DO
+         ALLOCATE(lEq%DirichletRegion(iRe)%gid(Ac))
+         lEq%DirichletRegion(iRe)%n   = Ac
+         lEq%DirichletRegion(iRe)%gid = gid(1:Ac)
+      END DO      
+
+      ! Convert gid range to tnNo
+      maxLength = MAXVAL(ltg)
+      DEALLOCATE(gNodes)
+      ALLOCATE(gNodes(maxLength))
+      gNodes = 0
+      DO a = 1, tnNo
+         gNodes(ltg(a)) = a
+      END DO
+      DO iRe = 1, lEq%nDirichletRegion
+         DO a = 1, lEq%DirichletRegion(iRe)%n
+            Ac = gNodes(lEq%DirichletRegion(iRe)%gid(a))
+            lEq%DirichletRegion(iRe)%gid(a) = Ac
+         END DO
+      END DO
+
+      ! Deallocate 
+      DEALLOCATE(gNodes, gid, id)
+      DO iRe = 1, nDirichletRegion
+         DirichletRegion(iRe)%n = 0
+         DEALLOCATE(DirichletRegion(iRe)%gid)
+      END DO
+      DEALLOCATE(DirichletRegion)
+
+      RETURN
+      END SUBROUTINE PARTDIRICHLETREGION
 !####################################################################

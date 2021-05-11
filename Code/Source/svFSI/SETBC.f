@@ -1332,4 +1332,74 @@
 
       RETURN
       END SUBROUTINE SETBCCMML
+!--------------------------------------------------------------------
+!     Set Dirichlet Regions
+      SUBROUTINE SETDIRICHLETREGION(lA, lY, lD, iEq)
+      USE COMMOD
+      IMPLICIT NONE
+      INTEGER(KIND=IKIND), INTENT(IN) :: iEq
+      REAL(KIND=RKIND), INTENT(INOUT) :: lA(tDof, tnNo), lY(tDof, tnNo),
+     2   lD(tDof, tnNo)
+
+      INTEGER(KIND=IKIND) :: i, a, s, e, Ac, id
+      REAL(KIND=RKIND) :: pavg
+
+      IF (eq(iEq)%nDirichletRegion .EQ. 0) THEN
+         IF (ALLOCATED(lhs%DirichletRegion))
+     2      lhs%DirichletRegion(:)%incFlag = .False.
+         RETURN
+      END IF
+      
+      s = eq(iEq)%s
+      e = eq(iEq)%e
+      IF (eq(iEq)%dof .EQ. nsd+1) THEN
+         e = e - 1
+      ELSE
+         err = " Dirichlet Region is for fluid only."
+         STOP
+      END IF
+
+      lhs%DirichletRegion(:)%incFlag = .True. 
+
+      DO i = 1, lhs%nDirichletRegion
+
+         id = lhs%DirichletRegion(i)%ID
+
+         ! Determine whether to apply internal Dirichlet
+         ! pavg = 0._RKIND
+         ! DO a=1, lhs%DirichletRegion(i)%n
+         !    Ac = eq(iEq)%DirichletRegion(id)%gid(a)
+         !    pavg = pavg + lY(e+1,Ac)
+         ! END DO
+         ! pavg = pavg / lhs%DirichletRegion(i)%n
+
+!          IF (id .EQ. 1 .AND. 
+!   2         (time .GT. 0.3_RKIND .AND. time .LT. 1.2_RKIND)) THEN
+!             lhs%DirichletRegion(i)%incFlag = .False.
+!          END IF
+
+         IF (id .EQ. 1 .AND. 
+     2      ( (time .LT. 0.463_RKIND) .OR. (time .GT. 1.2375_RKIND) )
+     3      ) THEN
+            lhs%DirichletRegion(i)%incFlag = .False.
+         END IF
+         IF (id .EQ. 2 .AND. 
+     2       time .GT. 0.463_RKIND .AND. time .LT. 1.2375_RKIND) THEN
+            lhs%DirichletRegion(i)%incFlag = .False.
+         END IF
+
+         IF (.NOT. lhs%DirichletRegion(i)%incFlag) CYCLE
+
+         DO a=1, lhs%DirichletRegion(i)%n
+            ! Can not use lhs%DirichletRegion(i)%glob(a) here 
+            ! since that's after lhs%map
+            Ac = eq(iEq)%DirichletRegion(i)%gid(a)
+            lA(s:e,Ac) = 0._RKIND
+            lY(s:e,Ac) = 0._RKIND
+         END DO
+      END DO
+
+      RETURN
+      END SUBROUTINE SETDIRICHLETREGION
 !####################################################################
+

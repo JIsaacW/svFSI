@@ -923,6 +923,16 @@
          END IF
       END DO
 
+!--------------------------------------------------------------------
+!     Searching for Dirichlet Regions
+      lEq%nDirichletRegion = 0
+      lEq%nDirichletRegion = list%srch("Add Dirichlet Region")
+      IF (lEq%nDirichletRegion .GT. 0 ) THEN
+         ALLOCATE(lEq%DirichletRegion(lEq%nDirichletRegion))
+         CALL FINDDIRICHLET_REGION(list,lEq%DirichletRegion,
+     2         lEq%nDirichletRegion)
+      END IF
+
       RETURN
       CONTAINS
 !--------------------------------------------------------------------
@@ -1091,6 +1101,113 @@
       END SUBROUTINE READDOMAIN
 !--------------------------------------------------------------------
       END SUBROUTINE READEQ
+!--------------------------------------------------------------------
+      SUBROUTINE FINDDIRICHLET_REGION(lt,Dr,nDr)
+      USE COMMOD
+      USE LISTMOD
+      USE ALLFUN
+
+      TYPE(listType), INTENT(INOUT) :: lt
+      INTEGER(KIND=IKIND), INTENT(IN) :: nDr
+      TYPE(DirichletRegionType), INTENT(INOUT) :: Dr(nDr)
+
+      TYPE(fileType) :: ft
+      TYPE(listType), POINTER :: lPtr
+      INTEGER(KIND=IKIND) :: fid, i, j, nB, nV, iDr, iM
+      REAL(KIND=RKIND), ALLOCATABLE :: BCoord(:,:), VCoord(:,:)
+      REAL(KIND=RKIND) :: VNorm(nsd), Mesh_Resolution
+      INTEGER(KIND=IKIND) :: domainID(gtnNo)
+
+      wrn = "Only first mesh is used @FINDDIRICHLET_REGION."
+      iM = 1
+
+      Mesh_Resolution = 2.0 ! mm
+      Mesh_Resolution = Mesh_Resolution * msh(iM)%scF
+      domainID = 0
+
+!     Plane cut
+      DO iDr = 1, nDr
+         lPtr => lt%get(ft, "Add Dirichlet Region",iDr)
+         ! Read aorta/mitral region mesh, valve mesh and norm
+         fid = ft%open()
+         READ(fid,*) nB
+         ALLOCATE(BCoord(nsd,nB))
+         DO i = 1, nB
+            READ(fid,*) BCoord(:,i)
+         END DO
+         READ(fid,*) nV
+         ALLOCATE(VCoord(nsd,nV))
+         DO i = 1, nV
+            READ(fid,*) VCoord(:,i)
+         END DO
+         READ(fid,*) VNorm
+         CLOSE(fid)
+
+         BCoord = BCoord * msh(iM)%scF
+         VCoord = VCoord * msh(iM)%scF
+         VNorm  = VNorm  * msh(iM)%scF
+
+         CALL PLANECUT(Dr(iDr)%n)
+         Dr(iDr)%ID = iDr
+         ALLOCATE(Dr(iDr)%gid(Dr(iDr)%n))
+         j = 0
+         DO i = 1, gtnNo
+            IF (domainID(i) .EQ. iDr) THEN
+               j =j + 1
+               Dr(iDr)%gid(j) = i
+            END IF
+         END DO
+
+         DEALLOCATE(BCoord,VCoord)
+      END DO ! iDr
+
+      RETURN
+
+      CONTAINS
+
+      SUBROUTINE PLANECUT(count)
+      USE COMMOD
+      USE LISTMOD
+      USE ALLFUN  
+      
+      INTEGER(KIND=IKIND), INTENT(OUT) :: count
+      REAL(KIND=RKIND) :: large, temp, xl(nsd)
+      INTEGER(KIND=IKIND) :: j0, i, j
+
+      count = 0
+      DO i = 1, gtnNo
+         large = HUGE(large)
+         j0 = 0
+         DO j = 1, nV
+            temp = NORM(x(:,i)-VCoord(:,j))
+            IF (temp .LT. large) THEN
+               large = temp
+               j0    = j
+            END IF
+         END DO
+
+
+         xl = x(:,i) - VCoord(:,j0)
+         IF ( (NORM(xl,VNorm) .GE. 0._RKIND) .AND.
+     2        (domainID(i) .EQ. 0) ) THEN
+            ! Closest point search
+            large = HUGE(large)
+            DO j = 1, nB
+               temp  = NORM(x(:,i)-BCoord(:,j))
+               IF (temp .LT. large) THEN
+                  large = temp
+               END IF               
+            END DO
+            IF (SQRT(large) .LT. Mesh_Resolution) THEN
+               domainID(i) = iDr
+               count = count + 1
+            END IF
+         END IF
+      END DO
+
+      RETURN
+      END SUBROUTINE PLANECUT
+      END SUBROUTINE FINDDIRICHLET_REGION
 !--------------------------------------------------------------------
 !     This subroutine reads LS type, tolerance, ...
       SUBROUTINE READLS(ilsType, lEq, list)
@@ -1731,6 +1848,7 @@
                   READ (fid,*) lBc%gm%d(:,a,i)
                END DO
             END DO
+            lBc%gm%d = lBc%gm%d * msh(iM)%scF
             CLOSE(fid)
          END IF
       CASE DEFAULT

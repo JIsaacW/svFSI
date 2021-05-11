@@ -49,14 +49,14 @@
 !--------------------------------------------------------------------
 
       SUBROUTINE FSILS_LHS_CREATE(lhs, commu, gnNo, nNo, nnz, gNodes,   &
-     &   rowPtr, colPtr, nFaces)
+     &   rowPtr, colPtr, nFaces, nDirichletRegion)
       INCLUDE "FSILS_STD.h"
       TYPE(FSILS_lhsType), INTENT(INOUT) :: lhs
       TYPE(FSILS_commuType), INTENT(IN) :: commu
       INTEGER(KIND=LSIP), INTENT(IN) :: gnNo, nNo, nnz
       INTEGER(KIND=LSIP), INTENT(IN) :: gNodes(nNo), rowPtr(nNo+1),     &
      &   colPtr(nnz)
-      INTEGER(KIND=LSIP), INTENT(IN) :: nFaces
+      INTEGER(KIND=LSIP), INTENT(IN) :: nFaces, nDirichletRegion
 
       INTEGER(KIND=LSIP) ip, i, j, a, Ac, ai, s, e, nTasks, tF, maxnNo, &
      &   ierr, comm, stat(mpsts)
@@ -76,13 +76,15 @@
       lhs%nnz    = nnz
       lhs%commu  = commu
       lhs%nFaces = nFaces
+      lhs%nDirichletRegion = nDirichletRegion
 
       nTasks = commu%nTasks
       comm   = commu%comm
       tF     = commu%tF
 
       ALLOCATE (lhs%colPtr(nnz), lhs%rowPtr(2,nNo), lhs%diagPtr(nNo),   &
-     &   lhs%map(nNo), lhs%face(nFaces))
+     &   lhs%map(nNo), lhs%face(nFaces),
+     &   lhs%DirichletRegion(nDirichletRegion))
 
 !     IF it is called sequentially
       IF (nTasks .EQ. 1) THEN
@@ -316,6 +318,7 @@
       lhs%nNo    = 0
       lhs%nnz    = 0
       lhs%nFaces = 0
+      lhs%nDirichletRegion = 0
 
       IF (ALLOCATED(lhs%colPtr)) DEALLOCATE(lhs%colPtr)
       IF (ALLOCATED(lhs%rowPtr)) DEALLOCATE(lhs%rowPtr)
@@ -323,27 +326,33 @@
       IF (ALLOCATED(lhs%cS)) DEALLOCATE(lhs%cS)
       IF (ALLOCATED(lhs%map)) DEALLOCATE(lhs%map)
       IF (ALLOCATED(lhs%face)) DEALLOCATE(lhs%face)
-
+      IF (ALLOCATED(lhs%DirichletRegion)) THEN
+         DO i=1, lhs%nDirichletRegion
+            DEALLOCATE(lhs%DirichletRegion(i)%glob)
+         END DO
+         DEALLOCATE(lhs%DirichletRegion)
+      END IF
+      
       RETURN
       END SUBROUTINE FSILS_LHS_FREE
 !####################################################################
-      SUBROUTINE FSILS_LHS_CREATE_C(pLHS, commu, gnNo, nNo, nnz, gNodes,&
-     &   rowPtr, colPtr, nFaces)
-      INCLUDE "FSILS_STD.h"
-      TYPE(FSILS_lhsType), POINTER, INTENT(OUT) :: pLHS
-      TYPE(FSILS_commuType), INTENT(IN) :: commu
-      INTEGER(KIND=LSIP), INTENT(IN) :: gnNo, nNo, nnz
-      INTEGER(KIND=LSIP), INTENT(IN) :: gNodes(nNo), rowPtr(nNo+1),     &
-     &   colPtr(nnz)
-      INTEGER(KIND=LSIP), INTENT(IN) :: nFaces
+   !    SUBROUTINE FSILS_LHS_CREATE_C(pLHS, commu, gnNo, nNo, nnz, gNodes,&
+   !   &   rowPtr, colPtr, nFaces)
+   !    INCLUDE "FSILS_STD.h"
+   !    TYPE(FSILS_lhsType), POINTER, INTENT(OUT) :: pLHS
+   !    TYPE(FSILS_commuType), INTENT(IN) :: commu
+   !    INTEGER(KIND=LSIP), INTENT(IN) :: gnNo, nNo, nnz
+   !    INTEGER(KIND=LSIP), INTENT(IN) :: gNodes(nNo), rowPtr(nNo+1),     &
+   !   &   colPtr(nnz)
+   !    INTEGER(KIND=LSIP), INTENT(IN) :: nFaces
 
-      TYPE(FSILS_lhsType), TARGET, SAVE :: lhs
+   !    TYPE(FSILS_lhsType), TARGET, SAVE :: lhs
 
-      CALL FSILS_LHS_CREATE(lhs, commu, gnNo, nNo, nnz, gNodes, rowPtr, &
-     &   colPtr, nFaces)
+   !    CALL FSILS_LHS_CREATE(lhs, commu, gnNo, nNo, nnz, gNodes, rowPtr, &
+   !   &   colPtr, nFaces)
 
-      pLHS => lhs
+   !    pLHS => lhs
 
-      RETURN
-      END SUBROUTINE FSILS_LHS_CREATE_C
+   !    RETURN
+   !    END SUBROUTINE FSILS_LHS_CREATE_C
 !####################################################################
