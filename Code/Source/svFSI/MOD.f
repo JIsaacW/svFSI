@@ -429,6 +429,12 @@
          INTEGER(KIND=IKIND), ALLOCATABLE :: gid(:)
       END TYPE DirichletRegionType
 
+!     Heart rate information
+      TYPE HeartRateType
+         REAL(KIND=RKIND) :: period  = 0._RKIND
+         REAL(KIND=RKIND) :: systole = 0._RKIND
+      END TYPE HeartRateType
+
 !--------------------------------------------------------------------
 !     All the subTypes are defined, now defining the major types that
 !     will be directly allocated
@@ -993,5 +999,7 @@
       TYPE(ibType), ALLOCATABLE :: ib
 !     Trilinos Linear Solver data type
       TYPE(tlsType), ALLOCATABLE :: tls
+!     Heart rate data type
+      TYPE(HeartRateType) :: heartrate
 
       END MODULE COMMOD

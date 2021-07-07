@@ -338,6 +338,7 @@
       LOGICAL THflag
       INTEGER(KIND=IKIND) fid, iBc, iBf, iM, iFa, phys(4),
      2   propL(maxNProp,10), outPuts(maxOutput), nDOP(4)
+      REAL(KIND=RKIND) rtmp
       CHARACTER(LEN=stdL) ctmp
       TYPE(listType), POINTER :: lPtr, lPBC, lPBF
       TYPE(fileType) fTmp
@@ -932,6 +933,13 @@
          CALL FINDDIRICHLET_REGION(list,lEq%DirichletRegion,
      2         lEq%nDirichletRegion)
       END IF
+
+!--------------------------------------------------------------------
+!     Searching for Heart Rate info
+      lPtr => list%get(rtmp, "Cardiac cycle length")
+      IF (ASSOCIATED(lPtr)) heartrate%period = rtmp
+      lPtr => list%get(rtmp, "Systolic length")
+      IF (ASSOCIATED(lPtr)) heartrate%systole = rtmp
 
       RETURN
       CONTAINS

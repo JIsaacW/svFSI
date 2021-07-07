@@ -1341,8 +1341,8 @@
       REAL(KIND=RKIND), INTENT(INOUT) :: lA(tDof, tnNo), lY(tDof, tnNo),
      2   lD(tDof, tnNo)
 
-      INTEGER(KIND=IKIND) :: i, a, s, e, Ac, id
-      REAL(KIND=RKIND) :: pavg
+      INTEGER(KIND=IKIND) :: i, a, s, e, Ac, id, icl
+      REAL(KIND=RKIND) :: pavg, Ts, Ti, Te
 
       IF (eq(iEq)%nDirichletRegion .EQ. 0) THEN
          IF (ALLOCATED(lhs%DirichletRegion))
@@ -1358,6 +1358,12 @@
          err = " Dirichlet Region is for fluid only."
          STOP
       END IF
+
+      ! Determine diastole or systle
+      icl = MAX( FLOOR(time/heartrate%period, KIND=IKIND), 0)
+      Ts  = REAL(icl, KIND=RKIND)*heartrate%period
+      Ti  = Ts + heartrate%systole
+      Te  = Ts + heartrate%period
 
       lhs%DirichletRegion(:)%incFlag = .True. 
 
@@ -1378,13 +1384,14 @@
 !             lhs%DirichletRegion(i)%incFlag = .False.
 !          END IF
 
+         ! Systole
          IF (id .EQ. 1 .AND. 
-     2      ( (time .LT. 0.463_RKIND) .OR. (time .GT. 1.2375_RKIND) )
-     3      ) THEN
+     2       (time .GT. Ts) .AND. (time .LE. Ti)) THEN
             lhs%DirichletRegion(i)%incFlag = .False.
          END IF
+         ! Diastole
          IF (id .EQ. 2 .AND. 
-     2       time .GT. 0.463_RKIND .AND. time .LT. 1.2375_RKIND) THEN
+     2       (time .GT. Ti) .AND. (time .LE. Te)) THEN
             lhs%DirichletRegion(i)%incFlag = .False.
          END IF
 
