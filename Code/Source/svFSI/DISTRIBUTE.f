@@ -1637,6 +1637,9 @@ c            wrn = " ParMETIS failed to partition the mesh"
 
       IF (cm%seq()) RETURN
 
+      CALL cm%bcast(heartrate%period)
+      CALL cm%bcast(heartrate%systole)
+      
       IF (cm%mas()) THEN
          nDirichletRegion = lEq%nDirichletRegion
          ALLOCATE(DirichletRegion(nDirichletRegion))
