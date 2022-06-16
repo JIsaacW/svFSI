@@ -392,7 +392,7 @@
      2         sl(eNoN), tmps(nsd,insd))
 
             DO e=1, msh(iM)%nEl
-               IF (dId.GE.0 .AND. ALLOCATED(msh(iM)%eId)) THEN
+               IF (dId.GT.0 .AND. ALLOCATED(msh(iM)%eId)) THEN
                   IF (.NOT.BTEST(msh(iM)%eId(e),dId)) CYCLE
                END IF
 !           Updating the shape functions, if this is a NURB
@@ -450,7 +450,7 @@
      2         sl(eNoN), tmps(nsd,insd))
 
             DO e=1, ib%msh(iM)%nEl
-               IF (dId.GE.0 .AND. ALLOCATED(ib%msh(iM)%eId)) THEN
+               IF (dId.GT.0 .AND. ALLOCATED(ib%msh(iM)%eId)) THEN
                   IF (.NOT.BTEST(ib%msh(iM)%eId(e),dId)) CYCLE
                END IF
 
@@ -1296,7 +1296,6 @@
       lDmn%stM%bss     = 0._RKIND
       lDmn%stM%afs     = 0._RKIND
       lDmn%stM%bfs     = 0._RKIND
-      lDmn%stM%khs     = 100._RKIND
 
       lDmn%stM%Tf%g     = 0._RKIND
       lDmn%stM%Tf%fType = 0
@@ -1561,15 +1560,9 @@
          br = b(ml+1:m)
       END IF
       nl = NINT(REAL(n, KIND=RKIND)*SUM(bl)/sb, KIND=IKIND)
-      IF (nl .EQ. 0) THEN
-         nl = 1
-         nr = n - 1
-      ELSE IF (nl .EQ. n) THEN
-         nl = n - 1
-         nr = 1
-      ELSE
-         nr = n - nl
-      END IF
+      IF (nl .EQ. 0) nl = 1
+      IF (nl .EQ. n) nl = n - 1
+      nr = n - nl
       ALLOCATE (Al(ml,nl), Ar(mr,nr))
 
       CALL SPLITJOBS(ml,nl,Al,bl)

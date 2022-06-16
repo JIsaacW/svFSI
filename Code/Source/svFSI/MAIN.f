@@ -41,12 +41,15 @@
       USE ALLFUN
       IMPLICIT NONE
 
-      LOGICAL l1, l2, l3
-      INTEGER(KIND=IKIND) i, iM, iBc, ierr, iEqOld, stopTS
+      LOGICAL l1, l2, l3, flag
+      INTEGER(KIND=IKIND) i, iM, iBc, ierr, iEqOld, stopTS, fNum
       REAL(KIND=RKIND) timeP(3)
 
       INTEGER(KIND=IKIND), ALLOCATABLE :: incL(:)
       REAL(KIND=RKIND), ALLOCATABLE :: Ag(:,:), Yg(:,:), Dg(:,:), res(:)
+
+      CHARACTER(LEN=stdL) :: PN, procRank
+      CHARACTER(LEN=stdL) :: MPfn
 
       IF (IKIND.NE.LSIP .OR. RKIND.NE.LSRP) THEN
          STOP "Incompatible datatype precision between solver and FSILS"
@@ -249,6 +252,24 @@
          l2 = MOD(cTS,stFileIncr) .EQ. 0
 !     Saving the result to restart bin file
          IF (l1 .OR. l2) CALL WRITERESTART(timeP)
+
+!     Saving the TXT files containing monitor points value
+         IF (mPts%flag) THEN
+            DO i= 1, mPts%nMP
+               IF (mPts%LSPID(1,i) == 1) THEN
+                  mPts%VMP(:,i) = Yn(:,mPts%LSPID(2,i))
+                  WRITE(procRank,'(I3)') cm%id()
+                  procRank = TRIM(adjustl(procRank))
+                  PN = ACHAR(i+64)//"-"//"proc"//procRank
+                  MPfn= TRIM(TRIM(monitorDirName)//"/Point"//PN)
+                  fNum = 251 + cm%id() + i
+                  OPEN(fNum,position='Append',FILE=TRIM(MPfn))
+                  WRITE(fNum,*) mPts%VMP(:,i)
+                  CLOSE(fNum)
+               END IF
+            END DO
+         END IF
+
 
 !     Writing results into the disk with VTU format
          IF (saveVTK) THEN

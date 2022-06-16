@@ -129,12 +129,13 @@
          ALLOCATE(x(nsd,gtnNo))
          x = gX
 
-!     Checks for shell elements
+!        Checks for shell elements
          DO iM=1, nMsh
             IF (msh(iM)%lShl) THEN
-               IF (msh(iM)%eType .EQ. eType_QUD4) THEN
-                  err = "Shell elements cannot be bilinear quads. "//
-     2               "Use higher-order quads, triangles, or NURBS."
+               IF (msh(iM)%eType.NE.eType_NRB .AND.
+     2             msh(iM)%eType.NE.eType_TRI3) THEN
+                  err = "Shell elements can be either triangles "//
+     2               "or C1-NURBS"
                END IF
                IF (msh(iM)%eType .EQ. eType_NRB) THEN
                   DO i=1, nsd-1
@@ -142,10 +143,10 @@
      2                  "NURBS for shell elements should be p > 1"
                   END DO
                END IF
-               IF (msh(iM)%eType .EQ. eType_TRI3) THEN
-                  IF (.NOT.cm%seq()) err = "Shells with linear "//
-     2               "triangles should be run sequentially"
-               END IF
+c               IF (msh(iM)%eType .EQ. eType_TRI) THEN
+c                  IF (.NOT.cm%seq()) err = "Triangular shell elements"//
+c     2               " should be run sequentially"
+c               END IF
             END IF
          END DO
 
@@ -341,6 +342,7 @@
             EXIT
          END IF
       END DO
+
       IF (flag) THEN
          DO iM=1, nMsh
             lPM => list%get(msh(iM)%name,"Add mesh",iM)
@@ -456,7 +458,6 @@
             END SELECT
          END IF
       END IF
-
       RETURN
       END SUBROUTINE READMSH
 !####################################################################

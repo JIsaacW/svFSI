@@ -43,9 +43,9 @@
       IMPLICIT NONE
 
       LOGICAL :: flag
-      INTEGER(KIND=IKIND) :: a, e, i, Ac, iEq, iM, iFa, iBf
+      INTEGER(KIND=IKIND) :: a, e, i, j, Ac, iEq, iM, iFa, iBf
 
-      INTEGER(KIND=IKIND), ALLOCATABLE :: part(:), gmtl(:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: part(:), gmtl(:), tmpID(:)
       REAL(KIND=RKIND4), ALLOCATABLE :: iWgt(:)
       REAL(KIND=RKIND), ALLOCATABLE :: wgt(:,:), wrk(:), tmpX(:,:),
      2   tmpD(:,:,:)
@@ -310,6 +310,41 @@
          CALL DISTEQ(eq(iEq), tMs, gmtl)
          dbg = "Distributed equation "//iEq
       END DO
+
+
+!     Point monitoring: Distributing mPts to processors
+      CALL cm%bcast(mPts%flag)
+      CALL cm%bcast(mPts%nMP)
+      CALL cm%bcast(monitorDirName)
+      IF (mPts%flag) THEN  
+         IF (cm%mas()) THEN
+            ALLOCATE(tmpID(mPts%nMP),tmpX(4,mPts%nMP))
+            tmpID = mPts%SPID
+            tmpX = mPts%VMP
+            DEALLOCATE(mPts%VMP)
+         ELSE
+            ALLOCATE(tmpID(mPts%nMP),tmpX(4,mPts%nMP))
+         END IF
+         
+         CALL cm%bcast(tmpID)
+         ALLOCATE(mPts%LSPID(2,mPts%nMP))
+         mPts%LSPID = 0
+         DO i = 1,mPts%nMP
+            DO  j = 1,SIZE(ltg)
+               IF (ltg(j) == tmpID(i)) THEN
+                  mPts%LSPID(1,i) = 1
+                  mPts%LSPID(2,i) = j
+               END IF
+            END DO
+         END DO
+         DEALLOCATE(tmpID)
+         
+         CALL cm%bcast(tmpX)
+         ALLOCATE(mPts%VMP(4,mPts%nMP))
+         mPts%VMP = tmpX
+         DEALLOCATE(tmpX)
+      END IF
+
 
 !     For CMM initialization
       flag = ALLOCATED(cmmBdry)
@@ -1051,7 +1086,6 @@
       CALL cm%bcast(lStM%afs)
       CALL cm%bcast(lStM%bfs)
       CALL cm%bcast(lStM%kap)
-      CALL cm%bcast(lStM%khs)
 
 !     Distribute fiber stress
       CALL cm%bcast(lStM%Tf%fType)

@@ -43,12 +43,15 @@
       IMPLICIT NONE
 
       LOGICAL :: flag
-      INTEGER(KIND=IKIND) :: i, iEq
+      INTEGER(KIND=IKIND) :: i, j, k, iEq, row, column, istat
       INTEGER(KIND=IKIND) :: tArray(8)
-      REAL(KIND=RKIND) :: roInf
+      INTEGER(KIND=IKIND) :: nn
+      REAL(KIND=RKIND) :: roInf, tol
+      REAL(KIND=RKIND) :: ANS
       CHARACTER(LEN=8) :: date
       CHARACTER(LEN=stdL) :: ctmp
       CHARACTER(LEN=stdL) :: mfsIn
+      CHARACTER(LEN=stdL) :: MPfname, PN
       TYPE(listType) :: list
       TYPE(listType), POINTER :: lPtr
       TYPE(fileType) :: fTmp
@@ -179,6 +182,17 @@
          stopTrigName = TRIM(appPath)//stopTrigName
          lPtr => list%get(ichckIEN, "Check IEN order")
 
+!        Get the points monitor information
+         monitorPtsName = "off"
+         lPtr =>list%get(monitorPtsName,
+     2      "Search file name to enable point monitoring")
+         IF (monitorPtsName == "on") THEN
+            monitorPtsName = "PointsMonitor"
+         ELSE IF (TRIM(monitorPtsName) == "") THEN
+            monitorPtsName = "off"
+         END IF
+         monitorPtsName = './'//monitorPtsName
+
          saveName = "result"
          lPtr => list%get(saveVTK, "Save results to VTK format")
          lPtr => list%get(saveName,"Name prefix of saved VTK files")
@@ -211,6 +225,63 @@
 !--------------------------------------------------------------------
 !     Reading the mesh
       CALL READMSH(list)
+
+!     Find closest grid points in the mesh according to input PointsMonitor file
+      INQUIRE(FILE=TRIM(monitorPtsName), EXIST=flag)
+      IF (flag) THEN
+         mPts%flag = 1
+         OPEN(725,FILE=TRIM(monitorPtsName))
+         READ(725,*)    ! Used to gap the first line
+         READ(725,*) column,row,tol,mPts%MType(1),mPts%MType(2)
+         ALLOCATE(mPts%GPC(row,column),mPts%DGS(row,column))
+         ALLOCATE(mPts%SPC(row,column),mPts%SPId(column))
+         ALLOCATE(mPts%VMP(4,column))
+         mPts%nMP = column
+         mPts%VMP = 0
+         DO i = 1, column
+	         READ(725,*) mPts%GPC(:,i)
+         END DO
+         CLOSE(725)
+         nn = size(x,2)
+         DO k = 1, column
+            DO j = 1, nn
+               mPts%DGS(:,k) = x(:,j)-mPts%GPC(:,k)
+               ANS = 0._RKIND
+               DO i = 1,3
+                  ANS = ANS + mPts%DGS(i,k)**2
+               END DO
+               ANS = SQRT(ANS)
+               IF ( ANS <= tol) THEN
+                  mPts%SPC(:,k) = x(:,j)
+                  mPts%SPId(k)=j
+                  EXIT
+               ELSE IF (j==nn) THEN
+                  STOP "Cannot find close enough point to monitor!"
+               END IF
+            END DO
+         END DO
+         print *, "Points Monitoring: On"
+         print *, "Sample points coordinates:"
+         DO j = 1,column
+            WRITE(PN,'(I1)') j
+            print *, "P"//TRIM(PN)//":", mPts%SPC(:,j)
+         END DO
+      ELSE
+         mPts%flag = .FALSE.
+         print *, "Points Monitoring: Off"
+      END IF
+!     This part is to create new monitor data files to overwrite the old
+      monitorDirName = "./Monitoring"
+      IF (mPts%flag) THEN
+         INQUIRE(FILE=monitorDirName,EXIST=flag)
+         IF (flag) THEN
+            CALL SYSTEM("rm -rf "//monitorDirName)
+            CALL SYSTEM("mkdir -p "//monitorDirName)
+         ELSE
+            CALL SYSTEM("mkdir -p "//monitorDirName)
+         END IF
+      END IF
+
 
 !     Reading immersed boundary mesh data
       i = list%srch("Add IB")
@@ -297,7 +368,7 @@
                DO i=1, eq(iEq)%nDmn
                   IF (eq(iEq)%dmn(i)%phys .NE. phys_ustruct .AND.
      2                eq(iEq)%dmn(i)%phys .NE. phys_struct) CYCLE
-                  IF (eq(iEq)%dmn(i)%stM%isoType .NE. stIso_HO_d) err =
+                  IF (eq(iEq)%dmn(i)%stM%isoType .NE. stIso_HO) err =
      2               "Active strain is allowed with Holzapfel-Ogden "//
      3               "passive constitutive model only"
                END DO
@@ -513,10 +584,9 @@
          propL(2,1) = damping
          propL(3,1) = elasticity_modulus
          propL(4,1) = poisson_ratio
-         propL(5,1) = solid_viscosity
-         propL(6,1) = f_x
-         propL(7,1) = f_y
-         IF (nsd .EQ. 3) propL(8,1) = f_z
+         propL(5,1) = f_x
+         propL(6,1) = f_y
+         IF (nsd .EQ. 3) propL(7,1) = f_z
          CALL READDOMAIN(lEq, propL, list)
 
          lPtr => list%get(pstEq, "Prestress")
@@ -554,12 +624,11 @@
          propL(1,1) = solid_density
          propL(2,1) = elasticity_modulus
          propL(3,1) = poisson_ratio
-         propL(4,1) = solid_viscosity
-         propL(5,1) = ctau_M
-         propL(6,1) = ctau_C
-         propL(7,1) = f_x
-         propL(8,1) = f_y
-         IF (nsd .EQ. 3) propL(9,1) = f_z
+         propL(4,1) = ctau_M
+         propL(5,1) = ctau_C
+         propL(6,1) = f_x
+         propL(7,1) = f_y
+         IF (nsd .EQ. 3) propL(8,1) = f_z
          CALL READDOMAIN(lEq, propL, list)
 
          lPtr => list%get(pstEq, "Prestress")
@@ -729,21 +798,19 @@
          propL(2,2) = elasticity_modulus
          propL(3,2) = poisson_ratio
          propL(4,2) = damping
-         propL(5,2) = solid_viscosity
-         propL(6,2) = f_x
-         propL(7,2) = f_y
-         IF (nsd .EQ. 3) propL(8,2) = f_z
+         propL(5,2) = f_x
+         propL(6,2) = f_y
+         IF (nsd .EQ. 3) propL(7,2) = f_z
 
 !        ustruct properties
          propL(1,3) = solid_density
          propL(2,3) = elasticity_modulus
          propL(3,3) = poisson_ratio
-         propL(4,3) = solid_viscosity
-         propL(5,3) = ctau_M
-         propL(6,3) = ctau_C
-         propL(7,3) = f_x
-         propL(8,3) = f_y
-         IF (nsd .EQ. 3) propL(9,3) = f_z
+         propL(4,3) = ctau_M
+         propL(5,3) = ctau_C
+         propL(6,3) = f_x
+         propL(7,3) = f_y
+         IF (nsd .EQ. 3) propL(8,3) = f_z
 
 !        lElas properties
          propL(1,4) = solid_density
@@ -871,6 +938,11 @@
                wrn = "Taylor-Hood basis is not allowed for NURBS mesh"//
      2            " or shells and fibers"
             ELSE
+               IF ( (msh(iM)%eType .NE. eType_TRI6)  .AND.
+     2              (msh(iM)%eType .NE. eType_TET10) ) THEN
+                  err = "Taylor-Hood basis is currently applicable"//
+     2               " for TRI6 (2D) or TET10 (3D) elements only"
+               END IF
                msh(iM)%nFs = 2
             END IF
          END IF
@@ -1037,8 +1109,6 @@
             CASE (poisson_ratio)
                lPtr => lPD%get(rtmp,"Poisson ratio",1,ll=0._RKIND,
      2            ul=0.5_RKIND)
-            CASE (solid_viscosity)
-               lPtr => lPD%get(rtmp,"Viscosity",ll=0._RKIND)
             CASE (conductivity)
                lPtr => lPD%get(rtmp,"Conductivity",1,ll=0._RKIND)
             CASE (f_x)
@@ -1835,7 +1905,7 @@
 
 !     Read BCs for shells with triangular elements. Not necessary for
 !     NURBS elements
-      lPtr => list%get(ctmp,"CST shell BC type")
+      lPtr => list%get(ctmp,"Shell BC type")
       IF (ASSOCIATED(lPtr)) THEN
          SELECT CASE (ctmp)
          CASE ("Fixed", "fixed", "Clamped", "clamped")
@@ -2451,19 +2521,9 @@ c     2         "can be applied for Neumann boundaries only"
          lPtr => lSt%get(lDmn%stM%C10, "c1")
          lPtr => lSt%get(lDmn%stM%C01, "c2")
 
-      CASE ("HGO", "HGO-decoupled", "HGO-d")
+      CASE ("HGO")
       ! Neo-Hookean ground matrix + quad penalty + anistropic fibers !
-         lDmn%stM%isoType = stIso_HGO_d
-         lDmn%stM%C10 = mu*0.5_RKIND
-         lPtr => lSt%get(lDmn%stM%aff, "a4")
-         lPtr => lSt%get(lDmn%stM%bff, "b4")
-         lPtr => lSt%get(lDmn%stM%ass, "a6")
-         lPtr => lSt%get(lDmn%stM%bss, "b6")
-         lPtr => lSt%get(lDmn%stM%kap, "kappa")
-
-      CASE ("HGO-ma", "HGO-modified")
-      ! Neo-Hookean ground matrix + quad penalty + anistropic fibers !
-         lDmn%stM%isoType = stIso_HGO_ma
+         lDmn%stM%isoType = stIso_HGO
          lDmn%stM%C10 = mu*0.5_RKIND
          lPtr => lSt%get(lDmn%stM%aff, "a4")
          lPtr => lSt%get(lDmn%stM%bff, "b4")
@@ -2482,9 +2542,9 @@ c     2         "can be applied for Neumann boundaries only"
      2         "with 2 family of directions"
          END IF
 
-      CASE ("HO", "Holzapfel", "HO-decoupled", "HO-d")
+      CASE ("HO", "Holzapfel")
       ! Holzapefel and Ogden model for myocardium !
-         lDmn%stM%isoType = stIso_HO_d
+         lDmn%stM%isoType = stIso_HO
          lPtr => lSt%get(lDmn%stM%a, "a")
          lPtr => lSt%get(lDmn%stM%b, "b")
          lPtr => lSt%get(lDmn%stM%aff, "a4f")
@@ -2493,20 +2553,6 @@ c     2         "can be applied for Neumann boundaries only"
          lPtr => lSt%get(lDmn%stM%bss, "b4s")
          lPtr => lSt%get(lDmn%stM%afs, "afs")
          lPtr => lSt%get(lDmn%stM%bfs, "bfs")
-         lPtr => lSt%get(lDmn%stM%khs, "k")
-
-      CASE ("HO-ma", "HO-modified")
-      ! Holzapefel and Ogden model for myocardium !
-         lDmn%stM%isoType = stIso_HO_ma
-         lPtr => lSt%get(lDmn%stM%a, "a")
-         lPtr => lSt%get(lDmn%stM%b, "b")
-         lPtr => lSt%get(lDmn%stM%aff, "a4f")
-         lPtr => lSt%get(lDmn%stM%bff, "b4f")
-         lPtr => lSt%get(lDmn%stM%ass, "a4s")
-         lPtr => lSt%get(lDmn%stM%bss, "b4s")
-         lPtr => lSt%get(lDmn%stM%afs, "afs")
-         lPtr => lSt%get(lDmn%stM%bfs, "bfs")
-         lPtr => lSt%get(lDmn%stM%khs, "k")
 
       CASE DEFAULT
          err = "Undefined constitutive model used"

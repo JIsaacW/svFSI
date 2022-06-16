@@ -582,7 +582,7 @@
       END SUBROUTINE FSILSINI
 !####################################################################
 !     Compute shell extended IEN for triangular elements. Reqd. to
-!     resolve bending moments.
+!     resolve bending moments
       SUBROUTINE SETSHLXIEN(lM)
       USE COMMOD
       IMPLICIT NONE
@@ -697,7 +697,7 @@
       RETURN
       END SUBROUTINE SHLINI
 !--------------------------------------------------------------------
-!     Initializing boundary condition variables for CST shells
+!     Initializing shell boundary condition variables
       SUBROUTINE SHLBCINI(lBc, lFa, lM)
       USE COMMOD
       USE ALLFUN
@@ -709,7 +709,7 @@
       INTEGER(KIND=IKIND) :: a, b, e, Ac, Bc, Ec
       LOGICAL :: bFlag
 
-      IF (lFa%eType .NE. eType_TRI3) RETURN
+      IF (lFa%eType .EQ. eType_NRB) RETURN
       DO e=1, lFa%nEl
          Ec = lFa%gE(e)
          DO a=1, lM%eNoN
